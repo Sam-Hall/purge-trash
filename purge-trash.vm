@@ -1,0 +1,116 @@
+## Macro Name: purge-trash
+## Visibility: Visible only to system administrators in the Macro Browser
+## Macro Title: Purge Trash
+## Description: Embed this in a page and view it to purge all trash in all spaces
+## Categories: Administration
+## Macro body: No
+##
+## Developed by: Sam Hall, Clement Martino and Pierre Lejeune
+## License: MIT
+## Source: https://github.com/Sam-Hall/purge-trash
+## Date created: 01/09/2016
+## Installed by: 
+
+## @param simulate:title=Simulate Only|type=boolean|required=true|desc=Don't actually purge anything|default=true
+## @param limit:title=Limit|type=int|required=false|desc=Limit the max number of pages to purge (default 100)
+## @param days:title=Days|type=int|required=false|desc=Define the period to keep documents (default 90)
+
+#if($permissionHelper.isConfluenceAdministrator($action.remoteUser) == "true")
+
+    #set($containerManagerClass=$content.class.forName('com.atlassian.spring.container.ContainerManager'))
+    #set($getInstanceMethod=$containerManagerClass.getDeclaredMethod('getInstance',null))
+    #set($containerManager=$getInstanceMethod.invoke(null,null))
+    #set($containerContext=$containerManager.containerContext)
+
+    #set($Integer = 0)
+    #set($Long = $Integer.longValue())
+    #set($trashManager=$containerContext.getComponent('trashManager'))
+    #set($spaceManager=$containerContext.getComponent('spaceManager'))
+    #set($pageManager=$containerContext.getComponent('pageManager'))
+    #set($attachmentManager=$pageManager.getAttachmentManager())
+
+    #set($spaces = $spaceManager.getAllSpaces())
+    #set($spaceCount = 0)
+    #set($purgeCount = 0)
+
+    ## Defaults
+    #if (!$paramsimulate)
+        #set ($paramsimulate="true")
+    #end
+    #if (!$paramlimit)
+        #set ($purgeLimit=100)
+    #else
+        #set ($purgeLimit=$Integer.parseInt($paramlimit))
+    #end
+    #if (!$paramdays)
+        #set ($purgeDays=90)
+    #else
+        #set ($purgeDays=$Integer.parseInt($paramdays))
+    #end
+
+    #set($delay = $purgeDays*24*3600*1000)
+    #set($today = $content.currentDate.time)
+    #set($date_limit = $today - $delay)
+
+<b>Purge Trash invoked (simulate = $paramsimulate, limit = $purgeLimit, days = $purgeDays)</b>
+<hr/>
+
+    #foreach($space in $spaces)
+        #set($spaceKey = $space.key)
+        #set($items = $trashManager.getNumberOfItemsInTrash($space))
+
+        #if ($items > 0 && $purgeCount < $purgeLimit)
+        <b>Found $items trash items in space: $spaceKey</b><br/>
+            #set($itemList = $trashManager.getTrashContents($space,0,$items))
+        <ul>
+            #foreach($item in $itemList)
+                #set($title = $item.getDisplayTitle())
+                #set($contentId = $item.getIdAsString())
+                #set($moddate = $item.getLastModificationDate())
+                <li/>$moddate - $contentId: $title
+
+                #if ($moddate.time < $date_limit)
+                    #if ($purgeCount < $purgeLimit)
+                        #set($attachments = $attachmentManager.getLatestVersionsOfAttachments($item))
+                        #set($attNameMap = {})
+                        #set($dupes = "false")
+                        #foreach($attachment in $attachments)
+                            #set($attId = $attachment.getIdAsString())
+                            #set($fname = $attachment.getDisplayTitle())
+                            #if ($attNameMap.get($fname))
+                                #set($dupes = "true")
+                            #end
+                            #set($void = $attNameMap.put($fname,"true"))
+                            <div style="margin-left:20px"><img alt="" src="/download/resources/com.atlassian.confluence.plugins.confluence-page-banner:page-banner-resources/images/grey_attach.png" height="16" width="16" title=""><i>$attId: $fname </i></div>
+                        #end
+                        #if ($dupes == "true")
+                            <b style="color:red"> ATTACHMENT INTEGRITY VIOLATION DETECTED</b>
+                        #else
+                          #if ($paramsimulate != "true")
+                              #set($bool = $trashManager.purge($spaceKey, $Long.parseLong($contentId)))
+                          #end
+                          #if ($bool == "true" || $paramsimulate == "true")
+                              #set($purgeCount = $purgeCount+1)
+                              <b> PURGED OK</b>
+                              #if ($purgeCount >= $purgeLimit)
+                                  <b> - PURGE LIMIT REACHED</b>
+                              #end
+                          #end
+                        #end
+                    #end
+                #else
+                    <b> TOO RECENT</b>
+                #end
+                </li>
+            #end
+        </ul>
+            #set($spaceCount = $spaceCount+1)
+        <hr/>
+        #end
+    #end
+
+<b>Emptied $purgeCount trash items from $spaceCount spaces.</b><br/>
+#else
+<b>Purge Trash may only be performed by a Confluence Administrator.</b>
+#end
+
