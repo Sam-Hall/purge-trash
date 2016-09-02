@@ -52,7 +52,8 @@
     #set($today = $content.currentDate.time)
     #set($date_limit = $today - $delay)
 
-<b>Purge Trash invoked (simulate = $paramsimulate, limit = $purgeLimit, days = $purgeDays)</b>
+<b>Purge Trash invoked (simulate = $paramsimulate, limit = $purgeLimit, days = $purgeDays)</b><br/>
+List format: <i>Date/time modified - ID: Page title</i>
 <hr/>
 
     #foreach($space in $spaces)
@@ -62,12 +63,12 @@
         #if ($items > 0 && $purgeCount < $purgeLimit)
         <b>Found $items trash items in space: $spaceKey</b><br/>
             #set($itemList = $trashManager.getTrashContents($space,0,$items))
-        <ul>
+            <ul>
             #foreach($item in $itemList)
                 #set($title = $item.getDisplayTitle())
                 #set($contentId = $item.getIdAsString())
                 #set($moddate = $item.getLastModificationDate())
-                <li/>$moddate - $contentId: $title
+                <li>$moddate - $contentId: $title
 
                 #if ($moddate.time < $date_limit)
                     #if ($purgeCount < $purgeLimit)
@@ -77,29 +78,31 @@
                         #foreach($attachment in $attachments)
                             #set($attId = $attachment.getIdAsString())
                             #set($fname = $attachment.getDisplayTitle())
+                            <div style="margin-left:20px"><span class="icon icon-file-unknown" title="File">File</span><i> $attId: $fname </i>
                             #if ($attNameMap.get($fname))
                                 #set($dupes = "true")
+                                <b style="color:red">DUPLICATE ATTACHMENT DETECTED</b>
                             #end
+                            </div>
                             #set($void = $attNameMap.put($fname,"true"))
-                            <div style="margin-left:20px"><img alt="" src="/download/resources/com.atlassian.confluence.plugins.confluence-page-banner:page-banner-resources/images/grey_attach.png" height="16" width="16" title=""><i>$attId: $fname </i></div>
                         #end
                         #if ($dupes == "true")
-                            <b style="color:red"> ATTACHMENT INTEGRITY VIOLATION DETECTED</b>
+                          <b style="color:red">CAN NOT PURGE ITEM - REMOVE DUPLICATE ATTACHMENTS</b>
                         #else
                           #if ($paramsimulate != "true")
                               #set($bool = $trashManager.purge($spaceKey, $Long.parseLong($contentId)))
                           #end
                           #if ($bool == "true" || $paramsimulate == "true")
                               #set($purgeCount = $purgeCount+1)
-                              <b> PURGED OK</b>
+                              <b style="color:green">PURGED OK</b>
                               #if ($purgeCount >= $purgeLimit)
-                                  <b> - PURGE LIMIT REACHED</b>
+                                  <b>-</b> <b style="color:blue">PURGE LIMIT REACHED</b>
                               #end
                           #end
                         #end
                     #end
                 #else
-                    <b> TOO RECENT</b>
+                    <b style="color:blue">TOO RECENT</b>
                 #end
                 </li>
             #end
